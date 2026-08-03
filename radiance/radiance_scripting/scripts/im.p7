@@ -14,8 +14,8 @@
 //     ui.table_next_column(); self.render_settings_row(ui, 1);
 //     ...                                        (ten times, by hand)
 //
-// even though an ordinary `for` loop was available. `grid` and `cells` below
-// make the loop form the obvious one to reach for.
+// even though an ordinary `for` loop was available. `grid`, `grid_cells` and
+// `grid_of` below make the loop form the obvious one to reach for.
 
 import radiance;
 
@@ -38,13 +38,25 @@ pub fn grid(
     });
 }
 
-// NOTE: an `array<fn()>` overload for heterogeneous cells is deliberately
-// absent — an array whose element type is a function type does not resolve
-// today, for any arity or return type (`array<fn()>`, `array<fn(int)>`,
-// `array<fn(int) -> int>` all fail with `TypeNotFound`). A bare `fn(int)`
-// parameter, as used above, is fine. See `specs/language-gaps.md` #27.
-// Heterogeneous rows keep using `ui.table` with explicit
-// `table_next_column()` calls.
+// Emit a table whose cells are an explicit, heterogeneous list of closures.
+//
+// `grid` above and `grid_of` below drive a *single* cell closure by index,
+// which suits homogeneous rows. When each cell draws something different, pass
+// them as data: `cells[i]` draws cell `i`, each preceded by the required
+// `table_next_column()`.
+pub fn grid_cells(
+    ui: box<radiance.IUiHost>,
+    id: string,
+    cols: int,
+    cells: array<fn()>,
+) {
+    ui.table(id, cols, () => {
+        for cell in cells {
+            ui.table_next_column();
+            cell();
+        }
+    });
+}
 
 // Emit a table over an explicit list of *ordinals* rather than a dense
 // `0..count` range, advancing a column per entry.

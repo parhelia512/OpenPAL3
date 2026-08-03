@@ -147,3 +147,69 @@ pub fn entry(host: box<radiance.IUiHost>) -> int {
     assert_eq!(events(&calls), vec![]);
     assert!(calls.iter().any(|c| matches!(c, UiCall::Table { .. })));
 }
+
+/// Heterogeneous rows — each cell draws something different, so the cells are
+/// passed as an `array<fn()>` rather than driven by index. This shape was
+/// impossible until `specs/language-gaps.md` #27 was fixed.
+#[test]
+fn grid_cells_emits_each_closure_in_order() {
+    let (recorder, ui_com) = RecordingUiHost::create();
+    run(
+        r#"
+import radiance;
+import radiance_scripting.im;
+
+pub fn entry(host: box<radiance.IUiHost>) -> int {
+    let cells: array<fn()> = [
+        () => { host.button("name", 10.0, 10.0); },
+        () => { host.dummy(0.0, 0.0); },
+        () => { host.button("value", 10.0, 10.0); },
+    ];
+    im.grid_cells(host, "settings", 2, cells);
+    0
+}
+"#,
+        ui_com,
+    );
+
+    let calls = recorder.calls.borrow();
+    assert_eq!(
+        events(&calls),
+        vec![
+            Ev::NextColumn,
+            Ev::Cell("name".into()),
+            Ev::NextColumn,
+            Ev::Blank,
+            Ev::NextColumn,
+            Ev::Cell("value".into()),
+        ],
+        "each cell closure runs once, after its own column advance"
+    );
+    assert!(
+        calls
+            .iter()
+            .any(|c| matches!(c, UiCall::Table { id, cols, .. } if id == "settings" && *cols == 2))
+    );
+}
+
+#[test]
+fn grid_cells_with_no_cells_emits_an_empty_table() {
+    let (recorder, ui_com) = RecordingUiHost::create();
+    run(
+        r#"
+import radiance;
+import radiance_scripting.im;
+
+pub fn entry(host: box<radiance.IUiHost>) -> int {
+    let cells: array<fn()> = [];
+    im.grid_cells(host, "t", 2, cells);
+    0
+}
+"#,
+        ui_com,
+    );
+
+    let calls = recorder.calls.borrow();
+    assert_eq!(events(&calls), vec![]);
+    assert!(calls.iter().any(|c| matches!(c, UiCall::Table { .. })));
+}
